@@ -173,9 +173,23 @@ else{
   const sr=new SR();sr.lang='de-DE';sr.interimResults=true;
   sr.onstart=()=>{mic.classList.add('an');st.textContent='Ich höre zu …';};
   sr.onresult=e=>{const r=e.results[e.results.length-1];st.textContent=r[0].transcript;if(r.isFinal)sende(r[0].transcript);};
-  sr.onerror=e=>{st.textContent='Fehler: '+e.error+(e.error=='not-allowed'?' – Mikrofon bitte erlauben.':'');};
+  const HINWEIS={
+   'audio-capture':'Kein Mikrofon gefunden. Bitte prüfen: 1) Android-Einstellungen → Apps → Chrome → Berechtigungen → Mikrofon → „Erlauben“. 2) Schnelleinstellungen (vom oberen Rand wischen) → „Mikrofonzugriff“ einschalten. 3) Andere Apps schließen, die das Mikrofon nutzen (z. B. Claude-App, Sprachaufnahme).',
+   'not-allowed':'Mikrofon gesperrt. Tippe oben links neben der Adresse auf das Symbol → Berechtigungen → Mikrofon → „Zulassen“. Dann Seite neu laden.',
+   'service-not-allowed':'Spracherkennung gesperrt. Seite neu laden und Mikrofon erlauben.',
+   'network':'Das Handy braucht Internet für die Spracherkennung.',
+   'no-speech':'Ich habe nichts gehört. Bitte nochmal tippen und deutlich sprechen.',
+   'aborted':'Abgebrochen.'};
+  sr.onerror=e=>{st.textContent=HINWEIS[e.error]||('Fehler: '+e.error);};
   sr.onend=()=>{mic.classList.remove('an');};
-  mic.onclick=()=>{try{sr.start();}catch(e){sr.stop();}};
+  let erlaubt=false;
+  mic.onclick=async()=>{
+    // Beim ersten Mal das Mikrofon direkt anfragen, damit Android/Chrome die Erlaubnis abfragt.
+    if(!erlaubt&&navigator.mediaDevices){
+      try{const s=await navigator.mediaDevices.getUserMedia({audio:true});s.getTracks().forEach(t=>t.stop());erlaubt=true;}
+      catch(e){st.textContent=(e.name=='NotFoundError'||e.name=='NotReadableError')?HINWEIS['audio-capture']:HINWEIS['not-allowed'];return;}
+    }
+    try{sr.start();}catch(e){sr.stop();}};
 }
 </script></body></html>"""
 
@@ -227,7 +241,21 @@ def main():
                             "-subj", "/CN=raspberrypi"], check=True, capture_output=True)
         except Exception:
             https = False
-    server = http.server.ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
+    try:
+        server = http.server.ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
+    except OSError:
+        # Das Programm laeuft schon (z. B. automatisch beim Start des Pi)
+        print("=" * 50)
+        print("  Das Pi-Mikrofon läuft bereits!")
+        print("  Adresse fürs Handy:")
+        print()
+        print(f"     https://{eigene_ip()}:{PORT}")
+        print("=" * 50)
+        try:
+            input("\n  Enter drücken zum Schließen ...")
+        except EOFError:
+            pass
+        return
     if https:
         kontext = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         kontext.load_cert_chain(ZERTIFIKAT, SCHLUESSEL)
