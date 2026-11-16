@@ -7,6 +7,14 @@ ORDNER="$HOME/smartphone-mikrofon"
 mkdir -p "$ORDNER" "$HOME/.config/autostart" "$HOME/.local/share/applications"
 wget -q -O "$ORDNER/sprachsteuerung.py" https://raw.githubusercontent.com/marchens1977/Smartphone-Mikrofon/main/sprachsteuerung.py
 
+# Hilfsprogramme zum Eintippen am Pi (fuer den Diktier-Modus)
+if ! command -v wtype >/dev/null || ! command -v xdotool >/dev/null; then
+  echo "Installiere Hilfsprogramme zum Tippen (kann 1 Minute dauern) ..."
+  sudo apt-get install -y wtype xdotool >/dev/null 2>&1 || \
+    (sudo apt-get update >/dev/null 2>&1 && sudo apt-get install -y wtype xdotool >/dev/null 2>&1) || \
+    echo "Hinweis: Installation hat nicht geklappt. Später: sudo apt install wtype xdotool"
+fi
+
 # Automatischer Start (unsichtbar im Hintergrund)
 cat > "$HOME/.config/autostart/smartphone-mikrofon.desktop" <<EOT
 [Desktop Entry]

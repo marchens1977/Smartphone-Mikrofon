@@ -3,20 +3,22 @@
 Mit diesem kleinen Programm wird dein Handy zur Sprach-Fernbedienung für deinen Raspberry Pi.
 Du sprichst ins Handy, und der Pi führt den Befehl aus (z. B. „Öffne YouTube“, „lauter“, „suche nach …“).
 
-## Einrichten (einmalig, am Raspberry Pi im Terminal)
+## Einrichten / Aktualisieren (am Raspberry Pi im Terminal einfügen)
 
 ```
-mkdir -p ~/smartphone-mikrofon && cd ~/smartphone-mikrofon
-wget -N https://raw.githubusercontent.com/marchens1977/Smartphone-Mikrofon/main/sprachsteuerung.py
+echo start
+wget -qO- https://raw.githubusercontent.com/marchens1977/Smartphone-Mikrofon/main/einrichten.sh | bash
+echo ende
 ```
 
-## Starten
+Danach startet das Programm automatisch mit dem Pi. Die Adresse fürs Handy steht im
+Startmenü unter Zubehör → Smartphone-Mikrofon.
 
-```
-cd ~/smartphone-mikrofon && python3 sprachsteuerung.py
-```
+## Zwei Modi
 
-Der Pi zeigt eine Adresse an (z. B. `https://192.168.178.25:8443`).
+- **Befehle:** z. B. „Öffne YouTube“.
+- **Diktieren:** Was du sagst, wird am Pi dort eingetippt, wo der Strich blinkt (z. B. im Claude-Chat).
+  Sag am Ende „senden“, um Enter zu drücken.
 
 ## Am Handy
 

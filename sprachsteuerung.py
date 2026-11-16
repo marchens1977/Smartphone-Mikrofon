@@ -62,12 +62,44 @@ def befehl_suche(rest):
     return f"Ich suche nach: {rest}"
 
 
+FEHLT_TIPPHILFE = ("Zum Tippen fehlt ein Hilfsprogramm. Am Pi das Einrichten nochmal ausführen "
+                   "oder eingeben: sudo apt install wtype xdotool")
+
+
+def tippe(text=None, taste=None):
+    """Tippt Text (oder drueckt eine Taste) im gerade aktiven Fenster am Pi.
+    Wayland (Standard beim Pi 400) braucht 'wtype', das aeltere X11 braucht 'xdotool'."""
+    if os.environ.get("WAYLAND_DISPLAY") and shutil.which("wtype"):
+        befehl = ["wtype", "-k", taste] if taste else ["wtype", "--", text]
+    elif shutil.which("xdotool"):
+        befehl = ["xdotool", "key", taste] if taste else ["xdotool", "type", "--delay", "20", "--", text]
+    else:
+        return False
+    subprocess.run(befehl, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+    return True
+
+
+def diktiere(text):
+    """Diktier-Modus: alles Gesagte wird am Pi eingetippt.
+    Endet der Satz mit 'senden' oder 'absenden', wird danach Enter gedrueckt."""
+    text = text.strip()
+    enter = False
+    for wort in ("absenden", "senden", "abschicken"):
+        if text.lower().rstrip(" .!?").endswith(wort):
+            text = text.rstrip(" .!?")[: -len(wort)].rstrip(" ,.")
+            enter = True
+            break
+    if text and not tippe(text + ("" if enter else " ")):
+        return FEHLT_TIPPHILFE
+    if enter and not tippe(taste="Return"):
+        return FEHLT_TIPPHILFE
+    return (f"Getippt: {text}" if text else "") + (" ⏎ gesendet" if enter else "")
+
+
 def befehl_schreibe(rest):
     if not rest:
         return "Was soll ich schreiben?"
-    if starte_erstes(["wtype", rest], ["xdotool", "type", "--delay", "30", rest]):
-        return f"Geschrieben: {rest}"
-    return "Zum Schreiben fehlt ein Hilfsprogramm. Auf dem Pi eingeben: sudo apt install wtype xdotool"
+    return f"Geschrieben: {rest}" if tippe(rest) else FEHLT_TIPPHILFE
 
 
 def befehl_screenshot(_):
@@ -148,20 +180,48 @@ SEITE = """<!DOCTYPE html>
  #log{text-align:left;font-size:1em}
  .du{color:#9ecbff;margin-top:10px}.pi{color:#b9f6ca}
  small{color:#999}
+ #modi{display:flex;gap:8px;margin-bottom:6px}
+ #modi button{flex:1;font-size:1.1em;padding:12px;border-radius:8px;border:2px solid #456;background:#1b2e3c;color:#ccc}
+ #modi button.aktiv{background:#f9a825;color:#000;border-color:#f9a825;font-weight:bold}
+ #tasten{display:none;gap:8px;margin-top:8px}
+ #tasten button{flex:1;font-size:1.2em;padding:14px;border-radius:8px;border:none;background:#455a64;color:#fff}
+ body.diktat #tasten{display:flex}
+ body.diktat #mic{background:#f9a825}
+ body.diktat #mic.an{background:#c62828}
+ #info{font-size:.95em;color:#bbb;min-height:2.4em}
 </style></head><body>
 <h1>🎤 Pi-Mikrofon</h1>
+<div id="modi"><button id="mBefehl">🗣️ Befehle</button><button id="mDiktat">⌨️ Diktieren</button></div>
+<div id="info"></div>
 <button id="mic">🎤</button>
 <div id="status">Tippe auf das Mikrofon und sprich.</div>
 <form id="f"><input id="t" placeholder="…oder hier tippen / Tastatur-Mikrofon" autocomplete="off"><button class="s">➤</button></form>
+<div id="tasten"><button id="bLoesch">⌫ Löschen</button><button id="bEnter">⏎ Senden</button></div>
 <div id="log"></div>
 <small>Sag „Hilfe“, um alle Befehle zu sehen.</small>
 <script>
 const st=document.getElementById('status'),log=document.getElementById('log'),mic=document.getElementById('mic');
+let modus=localStorage.getItem('modus')||'befehl';
+function setzeModus(m){modus=m;localStorage.setItem('modus',m);
+  document.body.classList.toggle('diktat',m=='diktat');
+  document.getElementById('mBefehl').classList.toggle('aktiv',m=='befehl');
+  document.getElementById('mDiktat').classList.toggle('aktiv',m=='diktat');
+  document.getElementById('info').textContent=m=='diktat'
+   ?'Was du sagst, wird am Pi dort eingetippt, wo der Strich blinkt (z. B. im Claude-Chat). Sag am Ende „senden“, um Enter zu drücken.'
+   :'Sag einen Befehl, z. B. „Öffne YouTube“. „Hilfe“ zeigt alle Befehle.';}
+document.getElementById('mBefehl').onclick=()=>setzeModus('befehl');
+document.getElementById('mDiktat').onclick=()=>setzeModus('diktat');
+setzeModus(modus);
+async function taste(m,anzeige){
+  try{const r=await fetch('befehl',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modus:m})});
+      st.textContent=(await r.json()).antwort;}catch(e){st.textContent='Pi nicht erreichbar.';}}
+document.getElementById('bEnter').onclick=()=>taste('enter');
+document.getElementById('bLoesch').onclick=()=>taste('loeschen');
 async function sende(text){
   if(!text.trim())return;
   log.insertAdjacentHTML('afterbegin','<div class="pi">…</div>');
   log.insertAdjacentHTML('afterbegin','<div class="du">Du: '+text.replace(/</g,'&lt;')+'</div>');
-  try{const r=await fetch('befehl',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+  try{const r=await fetch('befehl',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,modus})});
       const d=await r.json();log.children[1].textContent='Pi: '+d.antwort;}
   catch(e){log.children[1].textContent='Pi nicht erreichbar.';}
 }
@@ -208,10 +268,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         laenge = int(self.headers.get("Content-Length", 0))
         try:
-            text = json.loads(self.rfile.read(laenge)).get("text", "")
+            daten = json.loads(self.rfile.read(laenge))
         except Exception:
-            text = ""
-        antwort = verarbeite(text)
+            daten = {}
+        text = daten.get("text", "")
+        modus = daten.get("modus", "befehl")
+        try:
+            if modus == "enter":
+                antwort = "⏎ Enter gedrückt" if tippe(taste="Return") else FEHLT_TIPPHILFE
+            elif modus == "loeschen":
+                antwort = "⌫ gelöscht" if tippe(taste="BackSpace") else FEHLT_TIPPHILFE
+            elif modus == "diktat":
+                antwort = diktiere(text)
+            else:
+                antwort = verarbeite(text)
+        except Exception as fehler:
+            antwort = f"Fehler: {fehler}"
         print(f"  Gehört: {text!r}  ->  {antwort}")
         self._antworte(200, "application/json", json.dumps({"antwort": antwort}).encode())
 

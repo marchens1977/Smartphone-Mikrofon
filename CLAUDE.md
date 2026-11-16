@@ -10,6 +10,10 @@ Das Smartphone des Nutzers (Samsung, Chrome) dient als Sprach-Fernbedienung für
   - Liefert die Handy-Seite aus (im Python-Code eingebettet, Variable `SEITE`).
   - Das Handy macht die Spracherkennung (Chrome Web Speech API, Deutsch) und schickt den Text an `/befehl`.
   - Befehlsliste `BEFEHLE` oben im Code: Stichwörter → Aktion.
+- Zwei Modi am Handy: **Befehle** und **Diktieren** (Text wird am Pi im aktiven Fenster eingetippt,
+  z. B. im Claude-Chat; „senden“ am Satzende drückt Enter; Knöpfe ⌫ Löschen und ⏎ Senden).
+  Der Pi 400 hat kein Mikrofon – Diktieren ersetzt das Mikrofon-Symbol von Claude am Pi.
+- `einrichten.sh` – lädt neueste Version, installiert `wtype`/`xdotool`, Autostart + Startmenü-Eintrag.
 - Fallback: Textfeld, in das man mit dem Mikrofon der Handy-Tastatur sprechen kann.
 
 ## 2. Entscheidungen
@@ -24,10 +28,12 @@ Das Smartphone des Nutzers (Samsung, Chrome) dient als Sprach-Fernbedienung für
 |---|---|
 | 2026-11-16 | Erste Version (vorher kurz im Repository Angel-Adventure, dann hierher umgezogen) |
 | 2026-11-16 | Läuft beim Nutzer. `einrichten.sh`: Autostart + Startmenü-Eintrag; deutsche Hilfetexte bei Mikrofon-Fehlern |
+| 2026-11-16 | Diktier-Modus: Sprache wird am Pi eingetippt (Ersatz für fehlendes Pi-Mikrofon) |
 
 ## 4. Offene Ideen
 
 - Eigene Befehle des Nutzers ergänzen
+- Optional: echtes virtuelles Mikrofon (Audio-Streaming zu PipeWire), falls Diktieren nicht reicht
 
 ## 5. Zusammenarbeit
 
