@@ -23,13 +23,16 @@ Das Smartphone des Nutzers (Samsung, Chrome) dient als Sprach-Fernbedienung für
 | Datum | Was |
 |---|---|
 | 2026-11-16 | Erste Version (vorher kurz im Repository Angel-Adventure, dann hierher umgezogen) |
+| 2026-11-16 | Läuft beim Nutzer. `einrichten.sh`: Autostart + Startmenü-Eintrag; deutsche Hilfetexte bei Mikrofon-Fehlern |
 
 ## 4. Offene Ideen
 
-- Automatischer Start beim Hochfahren des Pi
 - Eigene Befehle des Nutzers ergänzen
 
 ## 5. Zusammenarbeit
+
+- Einfügen ins Pi-Terminal fügt manchmal Steuerzeichen (`\E[200~`) ein. Deshalb Befehle immer so geben:
+  erste Zeile `echo start`, dann die Befehle, letzte Zeile `echo ende`.
 
 - Nutzer ist Programmier-Laie: einfaches Deutsch, kleine nummerierte Schritte,
   klar sagen, was Claude übernimmt und was der Nutzer tun muss.
