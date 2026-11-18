@@ -33,6 +33,7 @@ Das Smartphone des Nutzers (Samsung, Chrome) dient als Sprach-Fernbedienung für
 | 2026-11-16 | Läuft beim Nutzer. `einrichten.sh`: Autostart + Startmenü-Eintrag; deutsche Hilfetexte bei Mikrofon-Fehlern |
 | 2026-11-16 | Diktier-Modus: Sprache wird am Pi eingetippt (Ersatz für fehlendes Pi-Mikrofon) |
 | 2026-11-18 | Aufnahme-Modus: Tonaufnahmen vom Handy, gespeichert am Pi in `~/Aufnahmen` |
+| 2026-11-18 | Aufnahme als eigenständige App ins Repository **Smartphone-Audio-Aufnahme** übernommen (Port 8444, mit MP3) |
 
 ## 4. Offene Ideen
 
