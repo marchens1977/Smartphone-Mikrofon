@@ -44,3 +44,24 @@ Das Smartphone des Nutzers (Samsung, Chrome) dient als Sprach-Fernbedienung für
   klar sagen, was Claude übernimmt und was der Nutzer tun muss.
 - Claude übernimmt alles, was möglich ist. Vor dem Hochladen testen.
 - Hardware: Samsung-Smartphone (Chrome) und Raspberry Pi 400.
+
+## 6. Hilfsprogramme und Tests
+
+Regel (dauerhaft, vom Nutzer gewünscht):
+
+1. Automatische Prüfungen (Tests) und Hilfsprogramme, die über eine einzelne Aufgabe hinaus nützlich sind,
+   werden im Projekt gespeichert (z. B. Ordner `werkzeuge/` oder `test/`) – nicht nur im Arbeitsbereich
+   der Sitzung, der beim Archivieren verloren geht.
+2. Hier im Tagebuch steht, wie man sie startet und was sie prüfen.
+3. Nach jeder Code-Änderung die vorhandenen Prüfungen laufen lassen; bei neuen Funktionen passende
+   Prüfpunkte ergänzen.
+4. Gibt es noch keine automatische Prüfung, bei der nächsten Code-Änderung eine einfache anlegen.
+5. Was Claude nicht selbst testen kann (z. B. das echte Handy, den Raspberry Pi), hier als Test für den
+   Nutzer vermerken.
+
+**Vorhandene Prüfungen:** noch keine (wird bei der nächsten Code-Änderung angelegt).
+
+**Tests für den Nutzer (kann Claude nicht selbst prüfen):**
+- Handy-Seite in Chrome öffnen, Mikrofon freigeben, Befehl sprechen → Pi reagiert.
+- Diktier-Modus: gesprochener Text erscheint am Pi im aktiven Fenster; „senden“ drückt Enter.
+- Autostart: Nach Neustart des Pi läuft die Sprachsteuerung von selbst.
