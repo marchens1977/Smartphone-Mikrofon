@@ -14,11 +14,15 @@ echo ende
 Danach startet das Programm automatisch mit dem Pi. Die Adresse fürs Handy steht im
 Startmenü unter Zubehör → Smartphone-Mikrofon.
 
-## Zwei Modi
+## Drei Modi
 
 - **Befehle:** z. B. „Öffne YouTube“.
 - **Diktieren:** Was du sagst, wird am Pi dort eingetippt, wo der Strich blinkt (z. B. im Claude-Chat).
   Sag am Ende „senden“, um Enter zu drücken.
+- **Aufnahme:** Tonaufnahme mit dem Handy-Mikrofon. Roter Knopf = Start, nochmal = Stopp.
+  Die Aufnahme wird am Pi im Ordner **Aufnahmen** (im Home-Ordner) gespeichert. Am Handy siehst
+  du die Liste aller Aufnahmen: anhören, aufs Handy laden oder löschen.
+  Während der Aufnahme den Handy-Bildschirm anlassen.
 
 ## Am Handy
 

@@ -10,9 +10,12 @@ Das Smartphone des Nutzers (Samsung, Chrome) dient als Sprach-Fernbedienung für
   - Liefert die Handy-Seite aus (im Python-Code eingebettet, Variable `SEITE`).
   - Das Handy macht die Spracherkennung (Chrome Web Speech API, Deutsch) und schickt den Text an `/befehl`.
   - Befehlsliste `BEFEHLE` oben im Code: Stichwörter → Aktion.
-- Zwei Modi am Handy: **Befehle** und **Diktieren** (Text wird am Pi im aktiven Fenster eingetippt,
+- Drei Modi am Handy: **Befehle**, **Diktieren** und **Aufnahme** (Text wird am Pi im aktiven Fenster eingetippt,
   z. B. im Claude-Chat; „senden“ am Satzende drückt Enter; Knöpfe ⌫ Löschen und ⏎ Senden).
   Der Pi 400 hat kein Mikrofon – Diktieren ersetzt das Mikrofon-Symbol von Claude am Pi.
+- Aufnahme-Modus: Handy nimmt per `MediaRecorder` auf (meist .webm), lädt an `/aufnahme` hoch,
+  Pi speichert in `~/Aufnahmen/`. Liste `/aufnahmen`, Abspielen `/aufnahmen/<name>`, Löschen `/aufnahme-loeschen`.
+  Ist der Pi nicht erreichbar, bietet das Handy die Datei zum Speichern am Handy an.
 - `einrichten.sh` – lädt neueste Version, installiert `wtype`/`xdotool`, Autostart + Startmenü-Eintrag.
 - Fallback: Textfeld, in das man mit dem Mikrofon der Handy-Tastatur sprechen kann.
 
@@ -29,10 +32,12 @@ Das Smartphone des Nutzers (Samsung, Chrome) dient als Sprach-Fernbedienung für
 | 2026-11-16 | Erste Version (vorher kurz im Repository Angel-Adventure, dann hierher umgezogen) |
 | 2026-11-16 | Läuft beim Nutzer. `einrichten.sh`: Autostart + Startmenü-Eintrag; deutsche Hilfetexte bei Mikrofon-Fehlern |
 | 2026-11-16 | Diktier-Modus: Sprache wird am Pi eingetippt (Ersatz für fehlendes Pi-Mikrofon) |
+| 2026-11-18 | Aufnahme-Modus: Tonaufnahmen vom Handy, gespeichert am Pi in `~/Aufnahmen` |
 
 ## 4. Offene Ideen
 
 - Eigene Befehle des Nutzers ergänzen
+- Aufnahmen: .webm zeigt im Player keine Gesamtlänge; evtl. am Pi mit `ffmpeg` in .mp3 umwandeln
 - Optional: echtes virtuelles Mikrofon (Audio-Streaming zu PipeWire), falls Diktieren nicht reicht
 
 ## 5. Zusammenarbeit

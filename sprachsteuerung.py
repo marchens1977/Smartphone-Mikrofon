@@ -25,6 +25,8 @@ PORT = 8443
 ORDNER = os.path.dirname(os.path.abspath(__file__))
 ZERTIFIKAT = os.path.join(ORDNER, "zertifikat.pem")
 SCHLUESSEL = os.path.join(ORDNER, "schluessel.pem")
+AUFNAHMEN = os.path.expanduser("~/Aufnahmen")   # hier landen die Tonaufnahmen vom Handy
+MAX_AUFNAHME = 1024 * 1024 * 1024               # hoechstens 1 GB pro Aufnahme
 
 
 # ---------------------------------------------------------------- Hilfen
@@ -189,28 +191,102 @@ SEITE = """<!DOCTYPE html>
  body.diktat #mic{background:#f9a825}
  body.diktat #mic.an{background:#c62828}
  #info{font-size:.95em;color:#bbb;min-height:2.4em}
+ body.aufnahme #f, body.aufnahme #log, body.aufnahme small{display:none}
+ body.aufnahme #mic{background:#c62828;font-size:70px}
+ body.aufnahme #mic.an{background:#555;animation:none}
+ #uhr{display:none;font-size:2.4em;font-variant-numeric:tabular-nums;margin:4px 0}
+ body.aufnahme #uhr{display:block}
+ #liste{display:none;text-align:left;margin-top:14px}
+ body.aufnahme #liste{display:block}
+ .auf{background:#1b2e3c;border-radius:8px;padding:10px;margin:8px 0}
+ .auf audio{width:100%;margin:6px 0}
+ .auf a,.auf button{color:#9ecbff;background:none;border:none;font-size:1em;margin-right:14px;padding:4px 0}
 </style></head><body>
 <h1>🎤 Pi-Mikrofon</h1>
-<div id="modi"><button id="mBefehl">🗣️ Befehle</button><button id="mDiktat">⌨️ Diktieren</button></div>
+<div id="modi"><button id="mBefehl">🗣️ Befehle</button><button id="mDiktat">⌨️ Diktieren</button><button id="mAuf">🔴 Aufnahme</button></div>
 <div id="info"></div>
 <button id="mic">🎤</button>
+<div id="uhr">0:00</div>
 <div id="status">Tippe auf das Mikrofon und sprich.</div>
 <form id="f"><input id="t" placeholder="…oder hier tippen / Tastatur-Mikrofon" autocomplete="off"><button class="s">➤</button></form>
 <div id="tasten"><button id="bLoesch">⌫ Löschen</button><button id="bEnter">⏎ Senden</button></div>
 <div id="log"></div>
 <small>Sag „Hilfe“, um alle Befehle zu sehen.</small>
+<div id="liste"></div>
 <script>
 const st=document.getElementById('status'),log=document.getElementById('log'),mic=document.getElementById('mic');
 let modus=localStorage.getItem('modus')||'befehl';
-function setzeModus(m){modus=m;localStorage.setItem('modus',m);
+function setzeModus(m){
+  if(rec&&rec.state=='recording'){st.textContent='Erst die Aufnahme stoppen.';return;}
+  modus=m;localStorage.setItem('modus',m);
   document.body.classList.toggle('diktat',m=='diktat');
+  document.body.classList.toggle('aufnahme',m=='aufnahme');
   document.getElementById('mBefehl').classList.toggle('aktiv',m=='befehl');
   document.getElementById('mDiktat').classList.toggle('aktiv',m=='diktat');
+  document.getElementById('mAuf').classList.toggle('aktiv',m=='aufnahme');
+  mic.textContent=m=='aufnahme'?'⏺':'🎤';
   document.getElementById('info').textContent=m=='diktat'
    ?'Was du sagst, wird am Pi dort eingetippt, wo der Strich blinkt (z. B. im Claude-Chat). Sag am Ende „senden“, um Enter zu drücken.'
-   :'Sag einen Befehl, z. B. „Öffne YouTube“. „Hilfe“ zeigt alle Befehle.';}
+   :m=='aufnahme'
+   ?'Tippe auf den roten Knopf, um eine Tonaufnahme zu starten. Nochmal tippen = Stopp. Die Aufnahme wird am Pi im Ordner „Aufnahmen“ gespeichert.'
+   :'Sag einen Befehl, z. B. „Öffne YouTube“. „Hilfe“ zeigt alle Befehle.';
+  st.textContent=m=='aufnahme'?'Bereit zur Aufnahme.':'Tippe auf das Mikrofon und sprich.';
+  if(m=='aufnahme')ladeListe();}
+let rec=null;
 document.getElementById('mBefehl').onclick=()=>setzeModus('befehl');
 document.getElementById('mDiktat').onclick=()=>setzeModus('diktat');
+document.getElementById('mAuf').onclick=()=>setzeModus('aufnahme');
+
+// ---------- Tonaufnahme
+const uhr=document.getElementById('uhr'),liste=document.getElementById('liste');
+let stuecke=[],start=0,tick=null,wach=null;
+function zeit(s){s=Math.floor(s);const h=Math.floor(s/3600),m=Math.floor(s/60)%60,x=s%60;
+  return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0');}
+function mb(b){return b<1048576?Math.max(1,Math.round(b/1024))+' KB':(b/1048576).toFixed(1).replace('.',',')+' MB';}
+async function ladeListe(){
+  try{const d=await (await fetch('aufnahmen')).json();
+    liste.innerHTML=d.length?'<b>Gespeichert am Pi:</b>':'<small>Noch keine Aufnahmen am Pi.</small>';
+    for(const a of d){const n=encodeURIComponent(a.name),div=document.createElement('div');div.className='auf';
+      div.innerHTML='<div>'+a.name.replace(/</g,'&lt;')+' <small>('+mb(a.groesse)+')</small></div>'
+       +'<audio controls preload="none" src="aufnahmen/'+n+'"></audio>'
+       +'<a href="aufnahmen/'+n+'" download>⬇ Aufs Handy</a><button>🗑 Löschen</button>';
+      div.querySelector('button').onclick=async()=>{
+        if(!confirm('„'+a.name+'“ wirklich löschen?'))return;
+        await fetch('aufnahme-loeschen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:a.name})});
+        ladeListe();};
+      liste.appendChild(div);}
+  }catch(e){liste.innerHTML='<small>Liste nicht ladbar – Pi nicht erreichbar.</small>';}}
+async function starteAufnahme(){
+  if(!window.MediaRecorder||!navigator.mediaDevices){st.textContent='Aufnehmen ist in diesem Browser nicht möglich. Bitte Chrome nutzen.';return;}
+  let strom;
+  try{strom=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:true}});}
+  catch(e){st.textContent=(e.name=='NotFoundError'||e.name=='NotReadableError')?HINWEIS['audio-capture']:HINWEIS['not-allowed'];return;}
+  const typ=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'].find(t=>MediaRecorder.isTypeSupported(t))||'';
+  rec=new MediaRecorder(strom,typ?{mimeType:typ,audioBitsPerSecond:128000}:{});
+  stuecke=[];
+  rec.ondataavailable=e=>{if(e.data.size)stuecke.push(e.data);};
+  rec.onstop=()=>{strom.getTracks().forEach(t=>t.stop());clearInterval(tick);
+    if(wach){wach.release().catch(()=>{});wach=null;}
+    mic.classList.remove('an');mic.textContent='⏺';
+    hochladen(new Blob(stuecke,{type:rec.mimeType||'audio/webm'}));};
+  rec.start(1000);start=Date.now();uhr.textContent='0:00';
+  tick=setInterval(()=>uhr.textContent=zeit((Date.now()-start)/1000),500);
+  mic.classList.add('an');mic.textContent='⏹';
+  st.textContent='🔴 Aufnahme läuft … Bildschirm bitte anlassen.';
+  try{wach=await navigator.wakeLock.request('screen');}catch(e){}
+}
+async function hochladen(blob){
+  const endung=blob.type.includes('mp4')?'m4a':blob.type.includes('ogg')?'ogg':'webm';
+  st.textContent='Speichere am Pi … ('+mb(blob.size)+')';
+  try{const r=await fetch('aufnahme?endung='+endung,{method:'POST',headers:{'Content-Type':blob.type},body:blob});
+    const d=await r.json();st.textContent=d.antwort;ladeListe();}
+  catch(e){
+    // Pi nicht erreichbar: Aufnahme wenigstens am Handy speichern
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='Aufnahme_'+new Date().toISOString().slice(0,19).replace(/[T:]/g,'-')+'.'+endung;
+    a.textContent='⬇ Aufnahme aufs Handy speichern';a.style.color='#9ecbff';
+    st.textContent='Pi nicht erreichbar! ';st.appendChild(a);}
+}
 setzeModus(modus);
 async function taste(m,anzeige){
   try{const r=await fetch('befehl',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modus:m})});
@@ -226,24 +302,27 @@ async function sende(text){
   catch(e){log.children[1].textContent='Pi nicht erreichbar.';}
 }
 document.getElementById('f').onsubmit=e=>{e.preventDefault();const t=document.getElementById('t');sende(t.value);t.value='';};
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-if(!SR){mic.disabled=true;mic.style.background='#555';
-  st.textContent='Spracherkennung hier nicht möglich – nutze das Mikrofon deiner Handy-Tastatur im Textfeld.';}
-else{
-  const sr=new SR();sr.lang='de-DE';sr.interimResults=true;
-  sr.onstart=()=>{mic.classList.add('an');st.textContent='Ich höre zu …';};
-  sr.onresult=e=>{const r=e.results[e.results.length-1];st.textContent=r[0].transcript;if(r.isFinal)sende(r[0].transcript);};
-  const HINWEIS={
+const HINWEIS={
    'audio-capture':'Kein Mikrofon gefunden. Bitte prüfen: 1) Android-Einstellungen → Apps → Chrome → Berechtigungen → Mikrofon → „Erlauben“. 2) Schnelleinstellungen (vom oberen Rand wischen) → „Mikrofonzugriff“ einschalten. 3) Andere Apps schließen, die das Mikrofon nutzen (z. B. Claude-App, Sprachaufnahme).',
    'not-allowed':'Mikrofon gesperrt. Tippe oben links neben der Adresse auf das Symbol → Berechtigungen → Mikrofon → „Zulassen“. Dann Seite neu laden.',
    'service-not-allowed':'Spracherkennung gesperrt. Seite neu laden und Mikrofon erlauben.',
    'network':'Das Handy braucht Internet für die Spracherkennung.',
    'no-speech':'Ich habe nichts gehört. Bitte nochmal tippen und deutlich sprechen.',
    'aborted':'Abgebrochen.'};
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+mic.addEventListener('click',()=>{if(modus!='aufnahme')return;
+  if(rec&&rec.state=='recording'){rec.stop();st.textContent='Aufnahme gestoppt.';}else starteAufnahme();});
+if(!SR){mic.dataset.keinSR=1;
+  st.textContent='Spracherkennung hier nicht möglich – nutze das Mikrofon deiner Handy-Tastatur im Textfeld.';}
+else{
+  const sr=new SR();sr.lang='de-DE';sr.interimResults=true;
+  sr.onstart=()=>{mic.classList.add('an');st.textContent='Ich höre zu …';};
+  sr.onresult=e=>{const r=e.results[e.results.length-1];st.textContent=r[0].transcript;if(r.isFinal)sende(r[0].transcript);};
   sr.onerror=e=>{st.textContent=HINWEIS[e.error]||('Fehler: '+e.error);};
   sr.onend=()=>{mic.classList.remove('an');};
   let erlaubt=false;
   mic.onclick=async()=>{
+    if(modus=='aufnahme')return;
     // Beim ersten Mal das Mikrofon direkt anfragen, damit Android/Chrome die Erlaubnis abfragt.
     if(!erlaubt&&navigator.mediaDevices){
       try{const s=await navigator.mediaDevices.getUserMedia({audio:true});s.getTracks().forEach(t=>t.stop());erlaubt=true;}
@@ -262,11 +341,88 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(daten)
 
+    def _json(self, daten):
+        self._antworte(200, "application/json", json.dumps(daten).encode())
+
     def do_GET(self):
+        pfad = urllib.parse.urlparse(self.path).path
+        if pfad == "/aufnahmen":
+            return self._json(liste_aufnahmen())
+        if pfad.startswith("/aufnahmen/"):
+            return self._sende_aufnahme(urllib.parse.unquote(pfad[len("/aufnahmen/"):]))
         self._antworte(200, "text/html; charset=utf-8", SEITE.encode())
+
+    def _sende_aufnahme(self, name):
+        datei = aufnahme_pfad(name)
+        if not datei:
+            return self._antworte(404, "text/plain", b"nicht gefunden")
+        groesse = os.path.getsize(datei)
+        typ = {"m4a": "audio/mp4", "ogg": "audio/ogg"}.get(name.rsplit(".", 1)[-1], "audio/webm")
+        # "Range" erlaubt dem Handy, in der Aufnahme vor- und zurueckzuspulen
+        anfang, ende = 0, groesse - 1
+        bereich = re.match(r"bytes=(\d*)-(\d*)", self.headers.get("Range", ""))
+        if bereich and groesse:
+            if bereich.group(1):
+                anfang = int(bereich.group(1))
+                if bereich.group(2):
+                    ende = min(int(bereich.group(2)), groesse - 1)
+            elif bereich.group(2):
+                anfang = max(0, groesse - int(bereich.group(2)))
+            self.send_response(206)
+            self.send_header("Content-Range", f"bytes {anfang}-{ende}/{groesse}")
+        else:
+            self.send_response(200)
+        self.send_header("Content-Type", typ)
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Content-Length", str(max(0, ende - anfang + 1)))
+        self.end_headers()
+        with open(datei, "rb") as f:
+            f.seek(anfang)
+            rest = ende - anfang + 1
+            while rest > 0:
+                stueck = f.read(min(65536, rest))
+                if not stueck:
+                    break
+                self.wfile.write(stueck)
+                rest -= len(stueck)
+
+    def _speichere_aufnahme(self, laenge):
+        if not 0 < laenge <= MAX_AUFNAHME:
+            return "Aufnahme ist leer oder zu groß."
+        endung = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("endung", ["webm"])[0]
+        if endung not in ("webm", "m4a", "ogg"):
+            endung = "webm"
+        os.makedirs(AUFNAHMEN, exist_ok=True)
+        name = datetime.datetime.now().strftime("Aufnahme_%Y-%m-%d_%H-%M-%S.") + endung
+        datei = os.path.join(AUFNAHMEN, name)
+        with open(datei + ".teil", "wb") as f:
+            while laenge > 0:
+                stueck = self.rfile.read(min(65536, laenge))
+                if not stueck:
+                    break
+                f.write(stueck)
+                laenge -= len(stueck)
+        if laenge > 0:  # Verbindung abgebrochen
+            os.remove(datei + ".teil")
+            return "Übertragung abgebrochen – bitte nochmal versuchen."
+        os.replace(datei + ".teil", datei)
+        return f"✅ Gespeichert am Pi: Aufnahmen/{name}"
 
     def do_POST(self):
         laenge = int(self.headers.get("Content-Length", 0))
+        pfad = urllib.parse.urlparse(self.path).path
+        if pfad == "/aufnahme":
+            antwort = self._speichere_aufnahme(laenge)
+            print(f"  Aufnahme: {antwort}")
+            return self._json({"antwort": antwort})
+        if pfad == "/aufnahme-loeschen":
+            try:
+                datei = aufnahme_pfad(json.loads(self.rfile.read(laenge)).get("name", ""))
+            except Exception:
+                datei = None
+            if datei:
+                os.remove(datei)
+            return self._json({"antwort": "Gelöscht." if datei else "Nicht gefunden."})
         try:
             daten = json.loads(self.rfile.read(laenge))
         except Exception:
@@ -289,6 +445,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def log_message(self, *args):
         pass  # keine unnoetigen Meldungen im Terminal
+
+
+def aufnahme_pfad(name):
+    """Gibt den Pfad einer Aufnahme zurueck - nur Dateien direkt im Aufnahmen-Ordner (Sicherheit)."""
+    if not name or name != os.path.basename(name) or name.startswith(".") or name.endswith(".teil"):
+        return None
+    datei = os.path.join(AUFNAHMEN, name)
+    return datei if os.path.isfile(datei) else None
+
+
+def liste_aufnahmen():
+    if not os.path.isdir(AUFNAHMEN):
+        return []
+    namen = [n for n in os.listdir(AUFNAHMEN) if aufnahme_pfad(n)]
+    return [{"name": n, "groesse": os.path.getsize(os.path.join(AUFNAHMEN, n))}
+            for n in sorted(namen, reverse=True)]
 
 
 def eigene_ip():
